@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:music_stream_flutter/domain/i_music_repository.dart';
 import 'package:music_stream_flutter/domain/music_list_model.dart';
 import 'package:music_stream_flutter/presentation/list_tile.dart';
+import 'package:music_stream_flutter/presentation/music_details_screen.dart';
 import 'package:music_stream_flutter/service_locator.dart';
 
 void main() {
@@ -122,6 +123,9 @@ class _MusicAppState extends State<MusicApp> {
                             onTap: () {
                               playMusic(index);
                               setSelectedMusicModel(index);
+                              Navigator.of(context).push(MaterialPageRoute(
+                                  builder: (context) => MusicDetailsScreen(
+                                      musicModel: musicModel)));
                             });
                       },
                       itemCount: musicList.length,

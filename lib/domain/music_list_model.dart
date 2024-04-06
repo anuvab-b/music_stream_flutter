@@ -19,12 +19,14 @@ class MusicModel {
   String artist;
   String url;
   String coverUrl;
+  String tags;
 
   MusicModel({
     required this.title,
     required this.artist,
     required this.url,
     required this.coverUrl,
+    required this.tags
   });
 
   factory MusicModel.fromJson(Map<String, dynamic> json) => MusicModel(
@@ -32,6 +34,7 @@ class MusicModel {
     artist: json["artist"],
     url: json["url"],
     coverUrl: json["coverUrl"],
+    tags: json["tags"],
   );
 
   Map<String, dynamic> toJson() => {
@@ -39,5 +42,6 @@ class MusicModel {
     "artist": artist,
     "url": url,
     "coverUrl": coverUrl,
+    "tags": tags,
   };
 }
