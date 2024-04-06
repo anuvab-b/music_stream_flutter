@@ -1,6 +1,13 @@
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:music_stream_flutter/domain/i_music_repository.dart';
+import 'package:music_stream_flutter/domain/music_list_model.dart';
+import 'package:music_stream_flutter/presentation/list_tile.dart';
+import 'package:music_stream_flutter/service_locator.dart';
 
 void main() {
+  ServiceLocator.init();
   runApp(const MyApp());
 }
 
@@ -11,105 +18,185 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MusicApp(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class MusicApp extends StatefulWidget {
+  const MusicApp({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<MusicApp> createState() => _MusicAppState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _MusicAppState extends State<MusicApp> {
+  List<MusicModel> musicList = List.empty(growable: true);
+  MusicModel? selectedMusicModel;
+  bool isLoading = false;
+  IconData playerIcon = Icons.play_arrow;
+  Duration duration = new Duration();
+  Duration position = new Duration();
 
-  void _incrementCounter() {
+  AudioPlayer audioPlayer = AudioPlayer();
+  bool isPlaying = false;
+
+  void playMusic(int index) async {
+    if (isPlaying && selectedMusicModel!.coverUrl != musicList[index].url) {
+      audioPlayer.pause();
+      await audioPlayer.play(UrlSource(musicList[index].url),
+          mode: PlayerMode.mediaPlayer);
+      setState(() {
+        selectedMusicModel = musicList[index];
+        playerIcon = Icons.pause_rounded;
+      });
+    } else if (!isPlaying) {
+      await audioPlayer.play(UrlSource(musicList[index].url));
+      setState(() {
+        isPlaying = true;
+        playerIcon = Icons.pause_rounded;
+      });
+    }
+
+    audioPlayer.onDurationChanged.listen((event) {
+      setState(() {
+        duration = event;
+      });
+    });
+    audioPlayer.onPositionChanged.listen((event) {
+      setState(() {
+        position = event;
+      });
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    fetchMusic();
+  }
+
+  fetchMusic() async {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      isLoading = true;
+    });
+    IMusicRepository musicRepository = getIt.get<IMusicRepository>();
+    musicList = await musicRepository.getMusicList();
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  setSelectedMusicModel(int index) {
+    setState(() {
+      selectedMusicModel = musicList[index];
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        backgroundColor: Colors.white,
+        title: const Text("My Playlist", style: TextStyle(color: Colors.black)),
+        elevation: 0,
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
+      body: Column(
+        children: [
+          Expanded(
+              child: isLoading
+                  ? const Center(child: CupertinoActivityIndicator())
+                  : ListView.builder(
+                      itemBuilder: (ctx, index) {
+                        MusicModel musicModel = musicList[index];
+                        return ListTileWidget(
+                            title: musicModel.title,
+                            artist: musicModel.artist,
+                            cover: musicModel.coverUrl,
+                            onTap: () {
+                              playMusic(index);
+                              setSelectedMusicModel(index);
+                            });
+                      },
+                      itemCount: musicList.length,
+                    )),
+          if (selectedMusicModel != null)
+            Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(color: Color(0x55212121), blurRadius: 8.0),
+                ],
+              ),
+              child: Column(children: [
+                Slider.adaptive(
+                    value: position.inSeconds.toDouble(),
+                    min: 0.0,
+                    max: duration.inSeconds.toDouble(),
+                    onChanged: (_) {}),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8.0, 0.0, 8.0, 8.0),
+                  child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Container(
+                          height: 60.0,
+                          width: 60.0,
+                          decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8.0),
+                              image: DecorationImage(
+                                  image: NetworkImage(
+                                      selectedMusicModel!.coverUrl),
+                                  fit: BoxFit.fill)),
+                        ),
+                        const SizedBox(width: 8.0),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(selectedMusicModel!.title,
+                                  style: const TextStyle(
+                                      fontSize: 16.0,
+                                      fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 6.0),
+                              Text(
+                                selectedMusicModel!.artist,
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 14.0),
+                              )
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                            onPressed: () {
+                              if (isPlaying) {
+                                audioPlayer.pause();
+                                setState(() {
+                                  isPlaying = false;
+                                  playerIcon = Icons.play_arrow_rounded;
+                                });
+                              } else {
+                                audioPlayer.resume();
+                                setState(() {
+                                  playerIcon = Icons.pause;
+                                  isPlaying = true;
+                                });
+                              }
+                            },
+                            iconSize: 40.0,
+                            icon: Icon(playerIcon))
+                      ]),
+                )
+              ]),
+            )
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
